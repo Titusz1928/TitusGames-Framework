@@ -1,7 +1,7 @@
 {
   "name": "com.titusgames.framework",
   "displayName": "TitusGames Framework",
-  "version": "1.5.0",
+  "version": "2.0.0",
   "unity": "6000.0",
   "description": "A reusable Unity framework for 2D and 3D games with scene, window, messagebox, localization, and audio management.",
   "author": {
@@ -9,7 +9,8 @@
     "email": "titusgames.studios@gmail.com"
   },
   "dependencies": {
-    "com.unity.textmeshpro": "3.0.6"
+    "com.unity.textmeshpro": "3.0.6",
+    "com.unity.inputsystem": "1.7.0"
   },
   "samples": [
     {

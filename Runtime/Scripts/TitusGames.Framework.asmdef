@@ -1,0 +1,9 @@
+{
+    "name": "TitusGames.Framework",
+    "rootNamespace": "TitusGames.Framework",
+    "references": [
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
+    ],
+    "autoReferenced": true
+}

@@ -1,37 +1,60 @@
 <p align="center">
-  <img src="Media/logo1.png" width="300" alt="Framework Logo">
+  <img src="Media~/logo1.png" width="300" alt="Framework Logo">
 </p>
 
-# TitusGames Framework
+# TitusGames Framework (v2.0.0)
 
-A reusable Unity framework for **2D and 3D** games, providing ready-made systems for Booting, Scene Management, Windows/UI, Localization, Audio, and in-game messages/notifications.  
-The framework is designed to help you rapidly build consistent projects without rewriting core systems every time.
+A modular, enterprise-ready Unity package designed for rapid **2D and 3D** game assembly. It includes streamlined subsystems for lifecycle initialization, scene routing, nested window management, deep localization streaming, dynamic audio mixing, and queue-driven messaging overlays.
+
+Version 2.0.0 migrates the entire framework core code to an optimized, decoupled UPM package architecture running custom Assembly Definitions (`.asmdef`) and native namespaces to insulate package logic from user land scripts.
 
 ---
 
+## Update 2.0:
+
+### 🏗 Architectural Paradigm: The `Runtime` Layer
+
+The framework utilizes a professional modular architecture. To maintain project cleanliness and prevent source-code collision, system logic is strictly decoupled from local assets. 
+
+The core engine is structured cleanly inside the invisible package directory:
+
+```text
+com.titusgames.framework/
+├── Runtime/
+│   ├── Scripts/     # Pre-compiled managers bounded by TitusGames.Framework.asmdef
+│   └── Resources/   # Package defaults (e.g., DefaultMessagePrefab, fallback language data)
+├── Samples~/        # Hidden source files imported safely via the Package Manager UI
+└── Media~/          # Static branding and logo assets
+```
+
 ## ⚙ Installation & Setup
-**1. Install via UPM**
 
-Open Unity and go to Window > Package Manager.
+### 1. Install via UPM (Unity Package Manager)
+1. Open your Unity Project (Unity 2022.3 LTS or Unity 6+ recommended).
+2. Navigate to **Window > Package Manager**.
+3. Click the **+** button in the top-left corner and select **Add package from git URL...**
+4. Paste the repository Git URL:
+```text
+   [https://github.com/Titusz1928/TitusGames-Framework.git](https://github.com/Titusz1928/TitusGames-Framework.git)
+```
 
-Click the + button and select Add package from git URL...
-
-Paste your repository URL: https://github.com/Titusz1928/TitusGames-Framework.git
-
-**2. Import the Framework**
-* In the Package Manager, select **TitusGames Framework**.
-* Find the **Samples** section. You will see two options:
+### 2. Import Dimensional Starters (Samples)
+1. In the Package Manager, select **TitusGames Framework**.
+2. Find the **Samples** section. You will see two options:
     * **2D Starter Framework:** Optimized for 2D projects (Orthographic cameras, 2D lighting).
     * **3D Starter Framework:** Optimized for 3D projects (Perspective cameras, Skybox, 3D lighting).
-* Click **Import** next to your preferred version.
+3. Click **Import** next to your preferred version.
 
-**3. Basic Configuration**
+### 3. Basic Configuration
 
-Move the Folder: You are free to move the FullFramework folder anywhere in your Assets directory (e.g., to Assets/_Framework).
+Namespaces: All scripts are decoupled into the framework layer. You must include the following line at the top of any game script accessing framework APIs:
+```csharp
+using TitusGames.Framework;
+```
 
-Build Settings: Remember to go to File > Build Settings and add your scenes to the Scenes in Build list.
+**Build Settings**: Remember to go to File > Build Settings and add your scenes to the Scenes in Build list.
 
-Boot Scene: Always start your game from the scene containing the Boot manager to ensure all systems initialize correctly.
+**Boot Scene**: Always start your game from the scene containing the Boot manager (or sandbox initializer) to ensure all systems initialize correctly.
 
 ## 🚀 Features
 
@@ -48,7 +71,19 @@ Boot Scene: Always start your game from the scene containing the Boot manager to
 
 ## 🧪 Sandbox & Team Workflow
 
-The newest update introduces the **Sandbox Scene**. This is designed specifically for **collaborative environments** where multiple people are working on different features simultaneously.
+The framework includes a dedicated Sandbox Scene located within the sample layers, engineered to streamline team workflows and mitigate Git merge conflicts.
+
+Why use the Sandbox?
+In a collaborative environment, editing core scenes such as "Main" or "Boot" frequently leads to structural merge conflicts. The Sandbox provides a safer alternative:
+
+**Isolated Testing**: Build out modular mechanics in a standalone scene environment without altering the primary production flow.
+
+**Full System Access**: The Sandbox automatically spawns standard instances of the Audio, Window, Localization, and Scene routers instantly upon runtime instantiation.
+
+**Zero Configuration Overload**: Simply branch a local duplicate of the Sandbox environment to prototype new mechanics using the pre-wired framework backbone.
+
+[!TIP]
+Best Practice: Reserve the Boot scene for the final game flow and structural master staging, while utilizing the Sandbox (or local duplicates of it) for daily development, feature prototyping, and isolated logic testing.
 
 ### Why use the Sandbox?
 In a team, editing the "Main" or "Boot" scene frequently leads to Git merge conflicts. The Sandbox allows you to:
@@ -132,31 +167,48 @@ SceneManager → LoadScene()
 
 # 🪟 WindowManager
 
-Windows are UI panels (prefabs) that you can open and close dynamically.
+The WindowManager provides a centralized, stack-based system for managing UI panels. It handles dynamic instantiation, automatic input mapping, time-scaling (pausing), and cursor state management.
+
+### ✔ Architectural Highlights
+**Chain of Responsibility**: The manager now implements the ICancelInputHandler interface, allowing it to hand off input events to other game systems (e.g., gameplay pause menus) if no windows are currently open.
+
+**Automatic Input Mapping**: Automatically switches between Player and UI Action Maps based on whether a window is active.
+
+**Settings-Driven Windows**: By attaching a UIWindowSettings component to your window prefab, the WindowManager automatically respects your rules for that specific window (Time freezing, Cursor visibility, and Input modes).
+
+**Universal Fallback**: If your project isn't using PlayerInput, the manager includes a hardware-level fallback to ensure the Escape key always closes the active window.
 
 ### ✔ How to Create a New Window
 
-Create a new UI panel.
+**1. Prepare the Prefab**: Create your UI panel. For advanced control (like freezing time or showing the cursor), attach the UIWindowSettings script to the root of your prefab.
 
-You can start by duplicating or modifying the WindowBase prefab.
+**2. Opening via Button**:
 
-Customize it however you like.
+* Add a Button to your UI.
 
-### ✔ Add a Button That Opens a Window
+* Attach the UI_OpenWindow script to the button object.
 
-Add a Button.
+* Assign your window prefab to the Window Prefab slot in the inspector.
 
-Add the UI_OpenWindow script.
+* In the OnClick() event, drag the UI_OpenWindow component into the slot and select WindowManager.OpenWindow.
 
-Drag your window prefab into its field.
+**3. Opening via Code**:
 
-Add an OnClick() event.
+```chsarp
+// Programmatically open a window
+WindowManager.Instance.OpenWindow(myWindowPrefab);
+```
 
-Drag the UI_OpenWindow script into the event.
+### ✔ Closing Windows
+*   **Automatic:** The manager natively listens for `UI/Cancel` inputs. When a user presses "Escape" (or the cancel button), the top-most window in the stack is closed automatically.
+*   **Programmatic:**
+    ```csharp
+    // Close the top-most active window
+    WindowManager.Instance.CloseTopWindow();
 
-Select:
+    // Force close all active windows
+    WindowManager.Instance.CloseAllWindows();
 
-WindowManager → Open()
 
 # 🌍 LocalizationManager
 
@@ -193,17 +245,12 @@ Save — the manager automatically reloads them at runtime.
 
 # 🔊 AudioManager
 
-Plays audio clips by name using files stored inside:
+The AudioManager provides a generic, string-based interface for managing audio. You do not need to modify the underlying scripts to add new sounds; the system automatically resolves audio clips stored in your project's Resources folder using the filename as a unique identifier.
 
-_Framework/Resources/Audio/
+[!WARNING]
+Manual File Placement Required: To keep the package lightweight, the framework does not include default audio. You must add your audio files to your /Resources/ directory for the manager to function.
 
-The AudioManager is generic. You don't need to modify the script to add new sounds; it automatically finds any audio file placed in the correct Resources folder using the filename as a key.
-
-> [!WARNING]
-> **Manual File Placement Required:** By default, the framework is empty. 
-> You must add your audio files for the manager to work.
-
-### ✔ Folder Structure
+### ✔ Required Folder Structure
 Place your files in these exact paths inside your Resources folder:
 
 Resources/Audio/Music/ (for .mp3, .wav, .ogg music loops)
@@ -240,6 +287,17 @@ AudioManager.Instance.PlaySFX("click");
 AudioManager.Instance.PlaySFX("explosion", 0.5f);
 ```
 
+### ✔ Randomized SFX (Adding Variety)
+You can now add dynamic variety to repetitive sounds (like footsteps or weapon fire) by randomizing pitch and volume to prevent "ear fatigue."
+```csharp
+// Randomize pitch (±0.1) and volume (within 0.1 of master volume)
+AudioManager.Instance.PlayRandomizedSFX("jump", 0.1f, 0.1f);
+
+// Pick a random clip from an array and play it with randomization
+string[] footstepSounds = { "step1", "step2", "step3" };
+AudioManager.Instance.PlayRandomSFXFromList(footstepSounds, 0.05f, 0.05f);
+```
+
 ### ✔ Volume & Settings
 ```csharp
 AudioManager.Instance.SetMusicVolume(0.7f); // Sets music to 70%
@@ -248,28 +306,45 @@ AudioManager.Instance.ToggleSFX(false);      // Mutes all sound effects
 
 # 💬 MessageManager
 
-The role of this manager is to visualize messages from the game/system to the user. For example: "Game saved", "... not available", etc.
+The MessageManager provides a queue-based system to display transient UI notifications to the user (e.g., "Game Saved", "Insufficient Funds"). It handles dynamic prefab instantiation, localization resolution, and icon assignment automatically.
 
-### Code example
+### Usage Examples
 
-The first parameter is the key for a localized text, this key will be replaced by the corresponding value from the localization .json files. The second value is the sprite that the message box will use.
+The manager supports three primary ways to display messages, depending on whether you are using localization, raw text, or custom Sprite references.
 
 ```chsarp
-Sprite infoIcon = Resources.Load<Sprite>("UI/Icons/info2");
-MessageManager.Instance.ShowMessage("testmessage", infoIcon);
+using TitusGames.Framework;
+using UnityEngine;
+
+// 1. Localized Message: Uses a JSON key for translation
+MessageManager.Instance.ShowMessage("game_saved_key", "info_icon_name");
+
+// 2. Direct Message: Displays raw string (bypasses localization)
+MessageManager.Instance.ShowMessageDirectly("Connection Lost!", "error_icon_name");
+
+// 3. Sprite Injection: Passes an explicit Sprite object directly
+Sprite customIcon = Resources.Load<Sprite>("UI/Icons/special_event");
+MessageManager.Instance.ShowMessageWithSprite("event_key", customIcon);
 ```
+### ✔ How it Works
 
-# 🧪 Example Workflow
+**1.Dynamic Resolution**: When you call a Show method, the manager looks for a prefab in /Resources/UI/Messaging/ (or your project's equivalent path).
 
-To create a simple menu:
+**2.Queue System**: If multiple messages are triggered rapidly, they are added to an internal queue and displayed sequentially to prevent overlapping UI clutter.
 
-A Play button → loads the game scene using SceneManager.
+**3.Automatic Cleanup**: Each message prefab is automatically instantiated, faded in, displayed for a configurable duration, faded out, and destroyed.
 
-A Settings button → opens a UI window through WindowManager.
+**4.Scene Independence**: The manager persists across scenes (DontDestroyOnLoad) and automatically searches for a MessageContainer (RectTransform) in the current active scene to act as the parent for new message instances.
 
-All button text → localized via JSON keys.
+### ✔ Customization
+You can adjust the behavior of the manager via the Inspector on the MessageManager object:
 
-Button click sounds → played using AudioManager.
+Message Duration: How long the message remains visible (default is 3 seconds).
+
+Fade Speed: The speed of the fade-in/fade-out animations.
+
+Containers: The manager will automatically register the MessageContainer found in your scene; however, you can manually override this via MessageManager.Instance.RegisterContainer(myRectTransform).
+
 
 # 📘 License
 
