@@ -1,7 +1,7 @@
 {
   "name": "com.titusgames.framework",
   "displayName": "TitusGames Framework",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "unity": "6000.0",
   "description": "A reusable Unity framework for 2D and 3D games with scene, window, messagebox, localization, and audio management.",
   "author": {

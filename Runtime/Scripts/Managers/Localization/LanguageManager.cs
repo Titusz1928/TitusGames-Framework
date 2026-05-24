@@ -9,74 +9,105 @@ public class LanguageManager : MonoBehaviour
     [Header("UI References")]
     public TMP_Dropdown dropdown;
 
-    // Must match the order in LocalizationManager
-    private string[] languageCodes = { "eng", "hun", "rom" }; 
+
     private string PREF_KEY = "languageIndex"; // Matched naming with LocalizationManager
 
-    void Start()
-    {
-        // Load saved language or default to 0 (English)
-        int savedLang = PlayerPrefs.GetInt(PREF_KEY, 0);
-        savedLang = Mathf.Clamp(savedLang, 0, languageCodes.Length - 1);
-
-        PopulateDropdown();
-        dropdown.value = savedLang;
-        
-        // Listen to dropdown changes
-        dropdown.onValueChanged.AddListener(OnLanguageChanged);
-        
-        // Initial label sync
-        UpdateDropdownLabels();
-    }
-
-    private void PopulateDropdown()
-    {
-        dropdown.ClearOptions();
-        List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
-        
-        for (int i = 0; i < languageCodes.Length; i++)
+        void Start()
         {
-            // Gets the localized name of the language itself (e.g., "English", "Română")
-            string localizedName = LocalizationManager.Instance.GetLocalizedValue(languageCodes[i]);
-            options.Add(new TMP_Dropdown.OptionData(localizedName));
+            if (LocalizationManager.Instance == null)
+            {
+                Debug.LogError("[LanguageManager] Cannot initialize: LocalizationManager Instance missing from scene context.");
+                return;
+            }
+
+            // Read the total available configurations directly from the initialized manager lists
+            int savedLang = PlayerPrefs.GetInt(PREF_KEY, 0);
+            savedLang = Mathf.Clamp(savedLang, 0, Mathf.Max(0, LocalizationManager.Instance.languageCodes.Count - 1));
+
+            PopulateDropdown();
+
+            if (dropdown.options.Count > 0)
+            {
+                dropdown.value = savedLang;
+            }
+
+            dropdown.onValueChanged.AddListener(OnLanguageChanged);
+            UpdateDropdownLabels();
         }
 
-        dropdown.AddOptions(options);
-    }
-
-    private void UpdateDropdownLabels()
-    {
-        for (int i = 0; i < languageCodes.Length; i++)
+        private void PopulateDropdown()
         {
-            if (i < dropdown.options.Count)
-                dropdown.options[i].text = LocalizationManager.Instance.GetLocalizedValue(languageCodes[i]);
+            dropdown.ClearOptions();
+            List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
+
+            // Generate temporary placeholder options based on length
+            int count = LocalizationManager.Instance.languageCodes.Count;
+            for (int i = 0; i < count; i++)
+            {
+                options.Add(new TMP_Dropdown.OptionData(""));
+            }
+
+            dropdown.AddOptions(options);
+            UpdateDropdownLabels(); // Pull correct translations instantly
         }
-        dropdown.RefreshShownValue();
+
+        private void UpdateDropdownLabels()
+        {
+            var codes = LocalizationManager.Instance.languageCodes;
+
+            for (int i = 0; i < codes.Count; i++)
+            {
+                if (i < dropdown.options.Count)
+                {
+                    // Live Localized Value Search: Ask the system how to say the language code inside the current language context!
+                    string liveLocalizedName = LocalizationManager.Instance.GetLocalizedValue(codes[i]);
+
+                    // If the active translation dictionary doesn't have it, fallback to its code
+                    if (liveLocalizedName.StartsWith("[MISSING:"))
+                    {
+                        dropdown.options[i].text = codes[i].ToUpper();
+                    }
+                    else
+                    {
+                        dropdown.options[i].text = liveLocalizedName;
+                    }
+                }
+            }
+            dropdown.RefreshShownValue();
+        }
+
+        private void OnLanguageChanged(int index)
+        {
+            ApplyLanguage(index);
+        }
+
+        private void ApplyLanguage(int index)
+        {
+            if (index < 0 || index >= LocalizationManager.Instance.languageCodes.Count) return;
+
+            Debug.Log($"[LanguageManager] UI switching system context to code: {LocalizationManager.Instance.languageCodes[index]}");
+
+            LocalizationManager.Instance.SetLanguageIndex(index);
+            UpdateDropdownLabels();
+
+            /*if (MessageManager.Instance != null)
+                MessageManager.Instance.ShowMessage("testmessage");*/
+        }
+
+        /// <summary>
+        /// Generalized helper execution shortcut for custom UI button hooks.
+        /// Pass the explicit integer element ID directly through Unity's Event Trigger inspector panel.
+        /// </summary>
+        public void SelectLanguageViaIndex(int targetIndex)
+        {
+            if (dropdown != null)
+            {
+                dropdown.value = targetIndex; // This automatically executes OnLanguageChanged via listener triggers
+            }
+            else
+            {
+                ApplyLanguage(targetIndex);
+            }
+        }
     }
-
-    private void OnLanguageChanged(int index)
-    {
-        ApplyLanguage(index);
-    }
-
-    private void ApplyLanguage(int index)
-    {
-        Debug.Log($"Switching language to: {languageCodes[index]}");
-
-        // Update the actual localization system
-        LocalizationManager.Instance.SetLanguageIndex(index);
-        
-        // Visual feedback
-        UpdateDropdownLabels();
-
-        // Test message example
-        if (MessageManager.Instance != null)
-            MessageManager.Instance.ShowMessage("testmessage");
-    }
-
-    // Helper methods for specific buttons
-    public void SelectEnglish() => OnLanguageChanged(0);
-    public void SelectHungarian() => OnLanguageChanged(1);
-    public void SelectRomanian() => OnLanguageChanged(2);
-}
 }

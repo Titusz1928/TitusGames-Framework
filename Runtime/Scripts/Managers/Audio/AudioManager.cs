@@ -10,9 +10,14 @@ public class AudioManager : MonoBehaviour
 {
     public static AudioManager Instance { get; private set; }
 
-    [Header("Settings")]
-    [SerializeField] private string musicFolderPath = "Audio/Music";
-    [SerializeField] private string sfxFolderPath = "Audio/SFX";
+    [Header("Resource Folder Paths")]
+    [Tooltip("Path relative to any Resources folder where your music tracks are located.")]
+    public string musicFolderPath = "Audio/Music";
+
+    [Tooltip("Path relative to any Resources folder where your sound effects are located.")]
+    public string sfxFolderPath = "Audio/SFX";
+
+    [Header("Pool Settings")]
     [SerializeField] private int sfxSourcePoolSize = 4;
 
     private AudioSource musicSource;
@@ -29,7 +34,6 @@ public class AudioManager : MonoBehaviour
 
     private string currentTrackName;
 
-    //MODIFIED
     private void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
@@ -48,64 +52,72 @@ public class AudioManager : MonoBehaviour
         }
 
         LoadSettings();
-        InitializeLibrary();
     }
 
-    private void InitializeLibrary()
-    {
-        // Automatically load ALL clips in the specified Resource folders
-        AudioClip[] musicClips = Resources.LoadAll<AudioClip>(musicFolderPath);
-        foreach (var clip in musicClips) musicLibrary[clip.name] = clip;
+        private AudioClip GetOrCreateAudioClip(string clipName, bool isMusic)
+        {
+            var library = isMusic ? musicLibrary : sfxLibrary;
 
-        AudioClip[] sfxClips = Resources.LoadAll<AudioClip>(sfxFolderPath);
-        foreach (var clip in sfxClips) sfxLibrary[clip.name] = clip;
+            // Check if we already loaded it previously
+            if (library.TryGetValue(clipName, out AudioClip cachedClip))
+            {
+                return cachedClip;
+            }
 
-        Debug.Log($"AudioLibrary Loaded: {musicLibrary.Count} Music, {sfxLibrary.Count} SFX clips.");
-    }
+            // Lazy load dynamically from Resources using the configurable path slug
+            string targetPath = isMusic ? $"{musicFolderPath}/{clipName}" : $"{sfxFolderPath}/{clipName}";
+            AudioClip newlyLoadedClip = Resources.Load<AudioClip>(targetPath);
 
-    private AudioSource GetNextSFXSource()
+            if (newlyLoadedClip != null)
+            {
+                library[clipName] = newlyLoadedClip;
+                return newlyLoadedClip;
+            }
+
+            Debug.LogWarning($"[AudioManager] Audio asset '{clipName}' could not be located at 'Resources/{targetPath}'. Please verify file placement.");
+            return null;
+        }
+
+        private AudioSource GetNextSFXSource()
     {
         AudioSource source = sfxPool[currentPoolIndex];
         currentPoolIndex = (currentPoolIndex + 1) % sfxPool.Count;
         return source;
     }
 
-    // --- GENERIC PUBLIC METHODS ---
+        // --- GENERIC PUBLIC METHODS ---
 
-    public void PlaySFX(string clipName, float volumeMultiplier = 1f)
-    {
-        if (!isSFXOn) return;
-
-        if (sfxLibrary.TryGetValue(clipName, out AudioClip clip))
+        public void PlaySFX(string clipName, float volumeMultiplier = 1f)
         {
-            AudioSource source = GetNextSFXSource();
-            source.pitch = 1f; // Standard pitch
-            source.PlayOneShot(clip, sfxVolume * volumeMultiplier);
+            if (!isSFXOn || string.IsNullOrEmpty(clipName)) return;
+
+            // Route through the lazy-loader helper
+            AudioClip clip = GetOrCreateAudioClip(clipName, isMusic: false);
+
+            if (clip != null)
+            {
+                AudioSource source = GetNextSFXSource();
+                source.pitch = 1f;
+                source.PlayOneShot(clip, sfxVolume * volumeMultiplier);
+            }
         }
-        else
+
+        //NEW
+        public void PlayRandomizedSFX(string clipName, float pitchRange = 0.1f, float volumeRange = 0.1f)
         {
-            Debug.LogWarning($"SFX '{clipName}' not found in {sfxFolderPath}");
+            if (!isSFXOn || string.IsNullOrEmpty(clipName)) return;
+
+            // Route through the lazy-loader helper
+            AudioClip clip = GetOrCreateAudioClip(clipName, isMusic: false);
+
+            if (clip != null)
+            {
+                AudioSource source = GetNextSFXSource();
+                source.pitch = Random.Range(1f - pitchRange, 1f + pitchRange);
+                float randomVolume = Random.Range(sfxVolume - volumeRange, sfxVolume);
+                source.PlayOneShot(clip, Mathf.Clamp01(randomVolume));
+            }
         }
-    }
-
-    //NEW
-    public void PlayRandomizedSFX(string clipName, float pitchRange = 0.1f, float volumeRange = 0.1f)
-    {
-        if (!isSFXOn) return;
-
-        if (sfxLibrary.TryGetValue(clipName, out AudioClip clip))
-        {
-            AudioSource source = GetNextSFXSource();
-
-            // Calculate randomized pitch and volume safely
-            source.pitch = Random.Range(1f - pitchRange, 1f + pitchRange);
-
-            // Subtracted from master scale to keep within safe boundaries
-            float randomVolume = Random.Range(sfxVolume - volumeRange, sfxVolume);
-
-            source.PlayOneShot(clip, Mathf.Clamp01(randomVolume));
-        }
-    }
 
     public void PlayRandomSFXFromList(string[] clipNames, float pitchRange = 0.1f, float volumeRange = 0.1f)
     {
@@ -115,19 +127,24 @@ public class AudioManager : MonoBehaviour
         PlayRandomizedSFX(clipNames[randomIndex], pitchRange, volumeRange);
     }
 
-    public void PlayMusic(string clipName, bool fade = true)
-    {
-        if (musicLibrary.TryGetValue(clipName, out AudioClip clip))
+        public void PlayMusic(string clipName, bool fade = true)
         {
-            if (musicSource.clip == clip) return; // Already playing
+            if (string.IsNullOrEmpty(clipName)) return;
 
-            currentTrackName = clipName; //new
-            if (fade) StartCoroutine(FadeToNewTrack(clip));
-            else SwitchMusicInstant(clip);
+            // Use your lazy-loader helper instead of reading the raw dictionary!
+            AudioClip clip = GetOrCreateAudioClip(clipName, isMusic: true);
+
+            if (clip != null)
+            {
+                if (musicSource.clip == clip) return; // Already playing
+
+                currentTrackName = clipName;
+                if (fade) StartCoroutine(FadeToNewTrack(clip));
+                else SwitchMusicInstant(clip);
+            }
         }
-    }
 
-    public void ResumePreviousMusic(string previousTrack, bool fade = true)
+        public void ResumePreviousMusic(string previousTrack, bool fade = true)
     {
         if (!string.IsNullOrEmpty(previousTrack)) PlayMusic(previousTrack, fade);
     }
@@ -247,9 +264,8 @@ public class AudioManager : MonoBehaviour
     //NEW
     public AudioClip GetClip(string clipName)
     {
-        if (sfxLibrary.TryGetValue(clipName, out AudioClip clip)) return clip;
-        return null;
-    }
+            return GetOrCreateAudioClip(clipName, isMusic: false);
+        }
 
 }
 }

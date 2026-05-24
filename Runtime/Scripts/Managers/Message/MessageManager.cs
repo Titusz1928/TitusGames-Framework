@@ -42,16 +42,19 @@ public class MessageManager : MonoBehaviour
         public bool isLocalized;
     }
 
-    private void Awake()
-    {
-        if (Instance != null) { Destroy(gameObject); return; }
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
+        private void Awake()
+        {
+            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
 
-        InitializeAssets();
-    }
+        private void Start()
+        {
+            InitializeAssets();
+        }
 
-    private void OnEnable()
+        private void OnEnable()
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
@@ -69,49 +72,49 @@ public class MessageManager : MonoBehaviour
             messageContainer = containerObj.GetComponent<RectTransform>();
     }
 
-    private void InitializeAssets()
+        private void InitializeAssets()
         {
-            // 1. Cache the default prefab instantly using the package path resolution string
+            // 1. Cache the default message template prefab
             string fullPrefabPath = $"{prefabFolderPath}/{defaultPrefabName}";
             GameObject defaultPrefab = Resources.Load<GameObject>(fullPrefabPath);
-            
-            // Fallback check: If standard package resolution fails, try loading directly by full package asset locator path string
-            if (defaultPrefab == null)
+
+            if (defaultPrefab != null)
             {
-                defaultPrefab = Resources.Load<GameObject>($"Packages/com.titusgames.framework/Runtime/Resources/{fullPrefabPath}");
+                prefabCache[defaultPrefabName] = defaultPrefab;
+            }
+            else
+            {
+                Debug.LogWarning($"[MessageManager] Default layout prefab missing at 'Resources/{fullPrefabPath}'. Ensure samples are imported into your Assets folder.");
             }
 
-            if (defaultPrefab != null) prefabCache[defaultPrefabName] = defaultPrefab;
-            else Debug.LogError($"[MessageManager] CRITICAL: Default prefab not found at Resources/{fullPrefabPath}");
-
-            // 2. Cache the default icon instantly
+            // 2. Cache the fallback system alert icon
             string fullIconPath = $"{iconFolderPath}/{defaultIconName}";
             Sprite defaultIcon = Resources.Load<Sprite>(fullIconPath);
-            
-            if (defaultIcon == null)
-            {
-                defaultIcon = Resources.Load<Sprite>($"Packages/com.titusgames.framework/Runtime/Resources/{fullIconPath}");
-            }
 
-            if (defaultIcon != null) iconCache[defaultIconName] = defaultIcon;
-            else Debug.LogWarning($"[MessageManager] Default icon not found at Resources/{fullIconPath}");
+            if (defaultIcon != null)
+            {
+                iconCache[defaultIconName] = defaultIcon;
+            }
+            else
+            {
+                Debug.LogWarning($"[MessageManager] Default icon graphics missing at 'Resources/{fullIconPath}'.");
+            }
         }
 
-    // --- Dynamic Asset Resolution Core ---
+        // --- Dynamic Asset Resolution Core ---
 
-    private GameObject GetPrefab(string prefabName)
+        private GameObject GetPrefab(string prefabName)
         {
-            if (string.IsNullOrEmpty(prefabName)) prefabName = defaultPrefabName;
+            // If the string is null or empty, force the default
+            if (string.IsNullOrWhiteSpace(prefabName))
+                prefabName = defaultPrefabName;
 
-            if (prefabCache.TryGetValue(prefabName, out GameObject cachedPrefab)) return cachedPrefab;
+            if (prefabCache.TryGetValue(prefabName, out GameObject cachedPrefab))
+                return cachedPrefab;
 
+            // Load attempt...
             string path = $"{prefabFolderPath}/{prefabName}";
             GameObject loadedPrefab = Resources.Load<GameObject>(path);
-            
-            if (loadedPrefab == null)
-            {
-                loadedPrefab = Resources.Load<GameObject>($"Packages/com.titusgames.framework/Runtime/Resources/{path}");
-            }
 
             if (loadedPrefab != null)
             {
@@ -119,24 +122,23 @@ public class MessageManager : MonoBehaviour
                 return loadedPrefab;
             }
 
-            Debug.LogWarning($"[MessageManager] Custom prefab '{prefabName}' not found. Falling back to default.");
+            // If load fails, definitely return the hardcoded default
             return prefabCache.ContainsKey(defaultPrefabName) ? prefabCache[defaultPrefabName] : null;
         }
 
         private Sprite GetIcon(string name, Sprite explicitSprite)
         {
             if (explicitSprite != null) return explicitSprite;
-            if (string.IsNullOrEmpty(name)) name = defaultIconName;
 
-            if (iconCache.TryGetValue(name, out Sprite cachedSprite)) return cachedSprite;
+            // Force default if empty
+            if (string.IsNullOrWhiteSpace(name))
+                name = defaultIconName;
+
+            if (iconCache.TryGetValue(name, out Sprite cachedSprite))
+                return cachedSprite;
 
             string path = $"{iconFolderPath}/{name}";
             Sprite loadedSprite = Resources.Load<Sprite>(path);
-            
-            if (loadedSprite == null)
-            {
-                loadedSprite = Resources.Load<Sprite>($"Packages/com.titusgames.framework/Runtime/Resources/{path}");
-            }
 
             if (loadedSprite != null)
             {
@@ -148,36 +150,36 @@ public class MessageManager : MonoBehaviour
         }
 
 
-    // --- Public API ---
+        // --- Public API ---
 
-    /// <summary> Shows a localized JSON key string using structural fallbacks. </summary>
-    public void ShowMessage(string key, string iconName = "", string customPrefabName = "")
-    {
-        messageQueue.Enqueue(new MessageData
+        /// <summary> Shows a localized JSON key string using structural fallbacks. </summary>
+        public void ShowMessage(string key, string iconName = "", string customPrefabName = "")
         {
-            text = key,
-            iconName = iconName,
-            customPrefabName = customPrefabName,
-            isLocalized = true
-        });
-        if (!isProcessing) StartCoroutine(ProcessQueue());
-    }
+            messageQueue.Enqueue(new MessageData
+            {
+                text = key,
+                iconName = iconName, // If this is "", the manager will resolve it as the default
+                customPrefabName = customPrefabName, // If this is "", the manager will resolve it as the default
+                isLocalized = true
+            });
+            if (!isProcessing) StartCoroutine(ProcessQueue());
+        }
 
-    /// <summary> Shows raw text explicitly bypassing translation checks. </summary>
-    public void ShowMessageDirectly(string message, string iconName = "", string customPrefabName = "")
-    {
-        messageQueue.Enqueue(new MessageData
+        /// <summary> Shows raw text explicitly bypassing translation checks. </summary>
+        public void ShowMessageDirectly(string message, string iconName = "", string customPrefabName = "")
         {
-            text = message,
-            iconName = iconName,
-            customPrefabName = customPrefabName,
-            isLocalized = false
-        });
-        if (!isProcessing) StartCoroutine(ProcessQueue());
-    }
+            messageQueue.Enqueue(new MessageData
+            {
+                text = message,
+                iconName = iconName,
+                customPrefabName = customPrefabName,
+                isLocalized = false
+            });
+            if (!isProcessing) StartCoroutine(ProcessQueue());
+        }
 
-    /// <summary> Overload allowing direct Sprite object injection alongside folder names. </summary>
-    public void ShowMessageWithSprite(string text, Sprite explicitIcon, string customPrefabName = "", bool useLocalization = true)
+        /// <summary> Overload allowing direct Sprite object injection alongside folder names. </summary>
+        public void ShowMessageWithSprite(string text, Sprite explicitIcon, string customPrefabName = "", bool useLocalization = true)
     {
         messageQueue.Enqueue(new MessageData
         {

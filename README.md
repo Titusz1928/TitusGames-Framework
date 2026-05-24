@@ -2,7 +2,7 @@
   <img src="Media~/logo1.png" width="300" alt="Framework Logo">
 </p>
 
-# TitusGames Framework (v2.0.0)
+# TitusGames Framework (v2.0.1)
 
 A modular, enterprise-ready Unity package designed for rapid **2D and 3D** game assembly. It includes streamlined subsystems for lifecycle initialization, scene routing, nested window management, deep localization streaming, dynamic audio mixing, and queue-driven messaging overlays.
 
@@ -236,19 +236,19 @@ The text will automatically update based on the selected language.
 
 Open the JSON files in:
 
-_Framework/Resources/Languages
-
+/Resources/Languages
 
 Add or modify your keys.
 
 Save — the manager automatically reloads them at runtime.
 
+### ✔ Add new language
+
+Edit the language_manifest.json file inside /Resources/Languages and add the new language code. Create a new file with this language code as a name and add the key-value pairs inside, similar to how the other language files look. Dont forget to update the other languages files so that they have the new language code too.
+
 # 🔊 AudioManager
 
 The AudioManager provides a generic, string-based interface for managing audio. You do not need to modify the underlying scripts to add new sounds; the system automatically resolves audio clips stored in your project's Resources folder using the filename as a unique identifier.
-
-[!WARNING]
-Manual File Placement Required: To keep the package lightweight, the framework does not include default audio. You must add your audio files to your /Resources/ directory for the manager to function.
 
 ### ✔ Required Folder Structure
 Place your files in these exact paths inside your Resources folder:
@@ -310,7 +310,7 @@ The MessageManager provides a queue-based system to display transient UI notific
 
 ### Usage Examples
 
-The manager supports three primary ways to display messages, depending on whether you are using localization, raw text, or custom Sprite references.
+The manager supports four primary ways to display messages, depending on whether you are using localization, raw text, custom Sprite references, or custom message prefabs.
 
 ```chsarp
 using TitusGames.Framework;

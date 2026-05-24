@@ -17,6 +17,16 @@ public class WindowManager : MonoBehaviour, ICancelInputHandler
     [Tooltip("If true, Escape key on keyboard will always attempt to close top window if no custom PlayerInput is registered.")]
     [SerializeField] private bool useUniversalKeyboardFallback = true;
 
+    [Header("Dynamic Input Naming Configuration")]
+    [Tooltip("The name of your UI/Interface Action Map.")]
+    public string uiActionMapName = "UI";
+        
+    [Tooltip("The name of your gameplay/character Action Map.")]
+    public string playerActionMapName = "Player";
+        
+    [Tooltip("The full action map path to bind for canceling/closing windows.")]
+    public string cancelActionPath = "UI/Cancel";
+
     private Stack<GameObject> windowStack = new Stack<GameObject>();
     private PlayerInput activePlayerInput;
     private InputAction uiCancelAction;
@@ -105,11 +115,11 @@ public class WindowManager : MonoBehaviour, ICancelInputHandler
         if (activePlayerInput != null)
         {
             // Look for standard UI layout Cancel action path
-            uiCancelAction = activePlayerInput.actions.FindAction("UI/Cancel");
-            if (uiCancelAction != null)
-            {
-                uiCancelAction.performed += OnCancelPressed;
-            }
+		uiCancelAction = activePlayerInput.actions.FindAction(cancelActionPath);
+                if (uiCancelAction != null)
+                {
+                    uiCancelAction.performed += OnCancelPressed;
+                }
         }
 
         UpdateInputAndTimeState();
@@ -255,17 +265,18 @@ public class WindowManager : MonoBehaviour, ICancelInputHandler
 
         // Apply Action Map State Switches
         if (activePlayerInput != null)
-        {
-            var uiMap = activePlayerInput.actions.FindActionMap("UI");
-            if (uiMap != null && !uiMap.enabled) uiMap.Enable();
-
-            var playerMap = activePlayerInput.actions.FindActionMap("Player");
-            if (playerMap != null)
             {
-                if (needsUIOnly) playerMap.Disable();
-                else playerMap.Enable();
+                // Dynamic Map Name switches replace hardcoded "UI" and "Player" strings
+                var uiMap = activePlayerInput.actions.FindActionMap(uiActionMapName);
+                if (uiMap != null && !uiMap.enabled) uiMap.Enable();
+
+                var playerMap = activePlayerInput.actions.FindActionMap(playerActionMapName);
+                if (playerMap != null)
+                {
+                    if (needsUIOnly) playerMap.Disable();
+                    else playerMap.Enable();
+                }
             }
-        }
     }
 
     private void OnDestroy()
