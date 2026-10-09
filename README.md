@@ -96,10 +96,6 @@ In a collaborative environment, editing core scenes such as "Main" or "Boot" fre
 
 **Zero Configuration Overload**: Simply branch a local duplicate of the Sandbox environment to prototype new mechanics using the pre-wired framework backbone.
 
-[!TIP]
-Best Practice: Reserve the Boot scene for the final game flow and structural master staging, while utilizing the Sandbox (or local duplicates of it) for daily development, feature prototyping, and isolated logic testing.
-
-
 In a team, editing the "Main" or "Boot" scene frequently leads to Git merge conflicts. The Sandbox allows you to:
 
 * **Isolated Testing:** Create your own "Test" scene to build a specific mechanic without touching the production flow.
