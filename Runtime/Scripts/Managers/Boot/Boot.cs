@@ -24,56 +24,7 @@ namespace TitusGames.Framework
             // === Initialize the Service Locator infrastructure ===
             ServiceLocator.Initialize();
 
-            // 1. Initialize Window Service
-            GetOrRegisterService<IWindowService>("WindowManager", () =>
-            {
-                var windowObj = new GameObject("WindowManager");
-                var service = windowObj.AddComponent<WindowManager>();
-                DontDestroyOnLoad(windowObj);
-                return service;
-            });
-
-            // 2. Initialize Localization Service (with initialization callback execution)
-            var localizationService = GetOrRegisterService<ILocalizationService>("LocalizationManager", () =>
-            {
-                var locObj = new GameObject("LocalizationManager");
-                var service = locObj.AddComponent<LocalizationManager>();
-                DontDestroyOnLoad(locObj);
-                return service;
-            });
-            localizationService.Initialize();
-
-            // 3. Initialize Message Service (Auto-locating fallback layout container components)
-            GetOrRegisterService<IMessageService>("MessageManager", () =>
-            {
-                var msgObj = new GameObject("MessageManager");
-                var service = msgObj.AddComponent<MessageManager>();
-                DontDestroyOnLoad(msgObj);
-
-                var container = GameObject.Find("MessageContainer");
-                if (container != null)
-                    service.RegisterContainer(container.GetComponent<RectTransform>());
-
-                return service;
-            });
-
-            // 4. Initialize Scene Service
-            GetOrRegisterService<ISceneService>("SceneManagerEX", () =>
-            {
-                var sceneObj = new GameObject("SceneManagerEX");
-                var service = sceneObj.AddComponent<SceneManagerEX>();
-                DontDestroyOnLoad(sceneObj);
-                return service;
-            });
-
-            // 5. Initialize Audio Service
-            GetOrRegisterService<IAudioService>("AudioManager", () =>
-            {
-                var audioObj = new GameObject("AudioManager");
-                var service = audioObj.AddComponent<AudioManager>();
-                DontDestroyOnLoad(audioObj);
-                return service;
-            });
+            RegisterCoreServices();
 
             // Optional small delay while visible
             yield return new WaitForSeconds(0.5f);
@@ -85,22 +36,56 @@ namespace TitusGames.Framework
             ServiceLocator.Current.Get<ISceneService>().LoadScene("MainMenu");
         }
 
-        /// <summary>
-        /// Attempts to fetch a service from the service locator registry container. 
-        /// If missing, triggers a factory callback routine to build and register it safely.
-        /// </summary>
-        private T GetOrRegisterService<T>(string name, System.Func<T> factory) where T : class
+        private void RegisterCoreServices()
         {
-            try
+            // 1. Window Service
+            ServiceLocator.Current.GetOrRegister<IWindowService>(() =>
             {
-                return ServiceLocator.Current.Get<T>();
-            }
-            catch
+                var go = new GameObject("WindowManager");
+                DontDestroyOnLoad(go);
+                return go.AddComponent<WindowManager>();
+            });
+
+            // 2. Localization Service
+            var localizationService = ServiceLocator.Current.GetOrRegister<ILocalizationService>(() =>
             {
-                T service = factory();
-                ServiceLocator.Current.Register<T>(service);
+                var go = new GameObject("LocalizationManager");
+                DontDestroyOnLoad(go);
+                return go.AddComponent<LocalizationManager>();
+            });
+            localizationService?.Initialize();
+
+            // 3. Message Service
+            ServiceLocator.Current.GetOrRegister<IMessageService>(() =>
+            {
+                var go = new GameObject("MessageManager");
+                DontDestroyOnLoad(go);
+                var service = go.AddComponent<MessageManager>();
+
+                var container = GameObject.Find("MessageContainer");
+                if (container != null && container.TryGetComponent<RectTransform>(out var rectTransform))
+                {
+                    service.RegisterContainer(rectTransform);
+                }
+
                 return service;
-            }
+            });
+
+            // 4. Scene Service
+            ServiceLocator.Current.GetOrRegister<ISceneService>(() =>
+            {
+                var go = new GameObject("SceneManagerEX");
+                DontDestroyOnLoad(go);
+                return go.AddComponent<SceneManagerEX>();
+            });
+
+            // 5. Audio Service
+            ServiceLocator.Current.GetOrRegister<IAudioService>(() =>
+            {
+                var go = new GameObject("AudioManager");
+                DontDestroyOnLoad(go);
+                return go.AddComponent<AudioManager>();
+            });
         }
 
         private IEnumerator FadeCanvas(float start, float end, float duration)

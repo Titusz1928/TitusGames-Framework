@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using static Codice.CM.Common.CmCallContext;
 
 namespace TitusGames.Framework
 {
@@ -8,41 +9,100 @@ namespace TitusGames.Framework
     {
         private readonly Dictionary<Type, object> _services = new Dictionary<Type, object>();
 
-        // Global access point to the locator itself
-        public static ServiceLocator Current { get; private set; }
+        private static ServiceLocator _current;
+
+        /// <summary>
+        /// Global access point to the locator. Auto-initializes if accessed before explicit initialization.
+        /// </summary>
+        public static ServiceLocator Current => _current ??= new ServiceLocator();
 
         public static void Initialize()
         {
-            Current = new ServiceLocator();
+            _current = new ServiceLocator();
         }
 
         /// <summary>
-        /// Registers a service implementation against its interface type.
+        /// Registers a service instance against its type.
         /// </summary>
-        public void Register<T>(T service)
+        public void Register<T>(T service, bool overwrite = false)
         {
             Type type = typeof(T);
+
             if (_services.ContainsKey(type))
             {
-                Debug.LogWarning($"[ServiceLocator] Service of type {type.Name} is already registered.");
+                if (!overwrite)
+                {
+                    Debug.LogWarning($"[ServiceLocator] Service of type {type.Name} is already registered.");
+                    return;
+                }
+
+                _services[type] = service;
+                Debug.Log($"[ServiceLocator] Service of type {type.Name} was overwritten.");
                 return;
             }
+
             _services.Add(type, service);
         }
 
         /// <summary>
-        /// Resolves and returns the requested service.
+        /// Resolves and returns the requested service. Throws an exception if missing or destroyed.
         /// </summary>
         public T Get<T>()
         {
             Type type = typeof(T);
-            if (!_services.TryGetValue(type, out var service))
+
+            if (!TryGet<T>(out T service))
             {
-                throw new Exception($"[ServiceLocator] Service of type {type.Name} is not registered!");
+                throw new InvalidOperationException($"[ServiceLocator] Service of type {type.Name} is not registered or has been destroyed!");
             }
-            return (T)service;
+
+            return service;
         }
 
+        /// <summary>
+        /// Safely attempts to retrieve a service without throwing exceptions.
+        /// Handles Unity MonoBehaviour lifetime checks (destroyed object safety).
+        /// </summary>
+        public bool TryGet<T>(out T service)
+        {
+            Type type = typeof(T);
+
+            if (_services.TryGetValue(type, out var rawService))
+            {
+                // Handle Unity lifetime checks: MonoBehaviours might be destroyed while dictionary still holds reference
+                if (rawService is UnityEngine.Object unityObj && unityObj == null)
+                {
+                    _services.Remove(type); // Clean up stale reference
+                    service = default;
+                    return false;
+                }
+
+                service = (T)rawService;
+                return true;
+            }
+
+            service = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Gets an existing service or uses a factory delegate to create and register it on demand.
+        /// </summary>
+        public T GetOrRegister<T>(Func<T> factory) where T : class
+        {
+            if (TryGet<T>(out var existingService))
+            {
+                return existingService;
+            }
+
+            T newService = factory();
+            Register<T>(newService);
+            return newService;
+        }
+
+        /// <summary>
+        /// Unregisters a service by its type.
+        /// </summary>
         public void Unregister<T>()
         {
             Type type = typeof(T);
@@ -50,6 +110,14 @@ namespace TitusGames.Framework
             {
                 _services.Remove(type);
             }
+        }
+
+        /// <summary>
+        /// Clears all registered services. Useful when resetting game state or swapping scenes.
+        /// </summary>
+        public void ClearAll()
+        {
+            _services.Clear();
         }
     }
 }

@@ -2,7 +2,7 @@
   <img src="Media~/logo1.png" width="300" alt="Framework Logo">
 </p>
 
-# TitusGames Framework (v2.1.0)
+# TitusGames Framework (v2.2.0)
 
 A modular, enterprise-ready Unity package designed for rapid **2D and 3D** game assembly. It includes streamlined subsystems for lifecycle initialization, scene routing, nested window management, deep localization streaming, dynamic audio mixing, and queue-driven messaging overlays.
 
@@ -10,23 +10,21 @@ Version 2.0.0 migrates the entire framework core code to an optimized, decoupled
 
 ---
 
-## Update 2.1.0:
+## Update 2.2.0:
 
-### 🔌 Transition: From Singletons to Service Locator
+### ⚡ Core Subsystem Overhaul & Direct Asset Playback
 
-In version 2.1.0, we have systematically eliminated all static Instance singletons in favor of a centralized Service Locator pattern. This shift transforms your project from a collection of "hidden global dependencies" into a clean, interface-driven service registry.
+Version 2.2.0 focuses on robustness, developer experience, and native asset integration across core services.
 
-#### Why this change?
-* **Explicit Dependency Management**: Systems no longer rely on "magic" global static fields. Dependencies are now explicitly requested through the ServiceLocator, making it clear which systems rely on which services.
-
-* **Composition Root Initialization**: By centralizing system creation in Boot and SandboxInitializer, we have removed the unpredictability of Awake and Start execution orders. You now have total control over the lifecycle of your global infrastructure.
-
-* **Interface-Driven Design**: Managers now implement interfaces (e.g., IMessageService). You can now swap concrete implementations for testing or platform-specific versions without modifying the consumer code.
-
-* **No More Zombie References**: By moving away from DontDestroyOnLoad singletons toward explicit registration, we have mitigated the file-locking and memory-leak issues commonly associated with Unity package removal.
+#### Key Highlights
+* **Service Locator Modernization**: Added native `TryGet<T>` support (eliminating external extension workarounds and exception overhead), Unity object lifetime checks (auto-cleaning destroyed `MonoBehaviour` references), and `GetOrRegister<T>` factory routines.
+* **Smart Window Stack & Duplicate Prevention**: `WindowManager` now prevents duplicate window instantiation. Opening an already active window prefab safely moves it to the top of the stack and brings it to the front visually (`SetAsLastSibling()`).
+* **Managed UI Overlay Snapshots**: Added automatic HUD/overlay snapshot and restore capability (`RegisterManagedOverlay()`), hiding active gameplay UI elements when menus open and restoring their exact state when closed.
+* **Native `AudioClip` Playback**: `AudioManager` and `IAudioService` now accept direct `AudioClip` parameters alongside string resource names, removing the need for custom adapter wrapper scripts.
+* **Window Event Callbacks**: `OnWindowOpened` and `OnWindowClosed` now emit the specific `GameObject` instance for precise event handling.
 
 #### Migration Workflow
-If you are upgrading from 2.0.x, replace all instances of static access with the new service registry:
+If you are upgrading from 2.1.x, replace all instances of static access with the new service registry:
 
 Before (Singleton):
 
@@ -36,7 +34,11 @@ MessageManager.Instance.ShowMessage("Hello World");
 After (Service Locator):
 
 ```c#
-ServiceLocator.Current.Get<IMessageService>().ShowMessage("Hello World");
+// Safe, exception-free service resolution
+if (ServiceLocator.Current.TryGet<IMessageService>(out var messageService))
+{
+    messageService.ShowMessage("Hello World");
+}
 ```
 
 ## ⚙ Installation & Setup
@@ -97,7 +99,7 @@ In a collaborative environment, editing core scenes such as "Main" or "Boot" fre
 [!TIP]
 Best Practice: Reserve the Boot scene for the final game flow and structural master staging, while utilizing the Sandbox (or local duplicates of it) for daily development, feature prototyping, and isolated logic testing.
 
-### Why use the Sandbox?
+
 In a team, editing the "Main" or "Boot" scene frequently leads to Git merge conflicts. The Sandbox allows you to:
 
 * **Isolated Testing:** Create your own "Test" scene to build a specific mechanic without touching the production flow.
@@ -154,12 +156,18 @@ The `SceneManager` lets you load scenes by name and exit the game. Every new sce
 
 ### ✔ Load a Scene
 ```csharp
-SceneManager.Instance.LoadScene("GameScene");
+if (ServiceLocator.Current.TryGet<ISceneService>(out var sceneService))
+{
+    sceneService.LoadScene("GameScene");
+}
 ```
 
 ### ✔ Exit the Game
 ```csharp
-SceneManager.Instance.ExitGame();
+if (ServiceLocator.Current.TryGet<ISceneService>(out var sceneService))
+{
+    sceneService.ExitGame();
+}
 ```
 
 ### ✔ Add a Button That Loads a Scene
@@ -183,13 +191,11 @@ SceneManager → LoadScene()
 The WindowManager provides a centralized, stack-based system for managing UI panels. It handles dynamic instantiation, automatic input mapping, time-scaling (pausing), and cursor state management.
 
 ### ✔ Architectural Highlights
-**Chain of Responsibility**: The manager now implements the ICancelInputHandler interface, allowing it to hand off input events to other game systems (e.g., gameplay pause menus) if no windows are currently open.
-
-**Automatic Input Mapping**: Automatically switches between Player and UI Action Maps based on whether a window is active.
-
-**Settings-Driven Windows**: By attaching a UIWindowSettings component to your window prefab, the WindowManager automatically respects your rules for that specific window (Time freezing, Cursor visibility, and Input modes).
-
-**Universal Fallback**: If your project isn't using PlayerInput, the manager includes a hardware-level fallback to ensure the Escape key always closes the active window.
+* **Duplicate Window Safeguard**: Opening an already-open window prefab brings the existing instance to the visual front (`SetAsLastSibling()`) and moves it to the top of the interaction stack instead of spawning a duplicate.
+* **Managed UI Overlay Snapshots**: Automatically snapshot and hide active gameplay UI elements (e.g., HUD, minimap, quest tracker) when the first window opens, automatically restoring their visibility when all windows close.
+* **Window Instance Callbacks**: Subscribe to `OnWindowOpened` and `OnWindowClosed` events to receive direct references to the affected `GameObject` instance.
+* **Chain of Responsibility**: Implements `ICancelInputHandler`, allowing input handling to pass smoothly to gameplay systems when no windows are active.
+* **Settings-Driven Windows**: Attaching a `UIWindowSettings` component to your window prefab allows automatic configuration for time freezing, cursor visibility, and input modes.
 
 ### ✔ How to Create a New Window
 
@@ -205,22 +211,33 @@ The WindowManager provides a centralized, stack-based system for managing UI pan
 
 * In the OnClick() event, drag the UI_OpenWindow component into the slot and select WindowManager.OpenWindow.
 
-**3. Opening via Code**:
+### ✔ Code Usage
 
-```chsarp
-// Programmatically open a window
-WindowManager.Instance.OpenWindow(myWindowPrefab);
+```csharp
+// Programmatically open or focus a window prefab
+GameObject windowInstance = ServiceLocator.Current.Get<IWindowService>().OpenWindow(myWindowPrefab);
+
+// Register a HUD overlay to auto-hide while menus are open
+ServiceLocator.Current.Get<IWindowService>().RegisterManagedOverlay(hudGameObject);
+
+// Close active top window or all windows
+ServiceLocator.Current.Get<IWindowService>().CloseTopWindow();
+ServiceLocator.Current.Get<IWindowService>().CloseAllWindows();
+
+// Listen to window lifecycle events
+IWindowService windowService = ServiceLocator.Current.Get<IWindowService>();
+windowService.OnWindowOpened += (win) => Debug.Log($"Opened window: {win.name}");
+windowService.OnWindowClosed += (win) => Debug.Log($"Closed window: {win.name}");
 ```
 
 ### ✔ Closing Windows
 *   **Automatic:** The manager natively listens for `UI/Cancel` inputs. When a user presses "Escape" (or the cancel button), the top-most window in the stack is closed automatically.
 *   **Programmatic:**
     ```csharp
-    // Close the top-most active window
-    WindowManager.Instance.CloseTopWindow();
-
-    // Force close all active windows
-    WindowManager.Instance.CloseAllWindows();
+    if (ServiceLocator.Current.TryGet<IWindowService>(out var windowService))
+{
+    windowService.CloseTopWindow();
+}
 
 
 # 🌍 LocalizationManager
@@ -261,7 +278,7 @@ Edit the language_manifest.json file inside /Resources/Languages and add the new
 
 # 🔊 AudioManager
 
-The AudioManager provides a generic, string-based interface for managing audio. You do not need to modify the underlying scripts to add new sounds; the system automatically resolves audio clips stored in your project's Resources folder using the filename as a unique identifier.
+The `AudioManager` supports both direct `AudioClip` reference playback and string-based dynamic loading from `Resources`. It manages pooling, track fading, randomized pitch/volume variation, and global volume settings without requiring custom wrapper adapters.
 
 ### ✔ Required Folder Structure
 Place your files in these exact paths inside your Resources folder:
@@ -285,36 +302,40 @@ Type the Filename (without extension) in the Track Name field.
 Music automatically handles cross-fading when switching tracks.
 
 ```csharp
-// Plays "MainMenuTheme.mp3" located in Resources/Audio/Music
-AudioManager.Instance.PlayMusic("MainMenuTheme");
+// Play using direct AudioClip or string name
+ServiceLocator.Current.Get<IAudioService>().PlayMusic(mainMenuThemeClip, fade: true);
+ServiceLocator.Current.Get<IAudioService>().PlayMusic("MainMenuTheme", fade: true);
 ```
 
 ### ✔ Playing Sound Effects (SFX)
-```csharp
-// Plays "click.wav" located in Resources/Audio/SFX
-AudioManager.Instance.PlaySFX("click");
-```
 
 ```csharp
-// Play with a specific volume multiplier (e.g., 50% volume)
-AudioManager.Instance.PlaySFX("explosion", 0.5f);
+// Direct AudioClip reference playback (recommended for ScriptableObjects / Inspector references)
+AudioClip clip = itemSO.useSound;
+ServiceLocator.Current.Get<IAudioService>().PlaySFX(clip);
+
+// String-based playback (from Resources/Audio/SFX)
+ServiceLocator.Current.Get<IAudioService>().PlaySFX("click");
+ServiceLocator.Current.Get<IAudioService>().PlaySFX("explosion", 0.5f); // 50% volume
 ```
 
 ### ✔ Randomized SFX (Adding Variety)
-You can now add dynamic variety to repetitive sounds (like footsteps or weapon fire) by randomizing pitch and volume to prevent "ear fatigue."
-```csharp
-// Randomize pitch (±0.1) and volume (within 0.1 of master volume)
-AudioManager.Instance.PlayRandomizedSFX("jump", 0.1f, 0.1f);
+Prevents ear fatigue by applying dynamic pitch and volume variance to repetitive actions (footsteps, weapon swings, combat hits):
 
-// Pick a random clip from an array and play it with randomization
-string[] footstepSounds = { "step1", "step2", "step3" };
-AudioManager.Instance.PlayRandomSFXFromList(footstepSounds, 0.05f, 0.05f);
+```csharp
+// Randomized pitch (±0.1) and volume using direct AudioClip
+ServiceLocator.Current.Get<IAudioService>().PlayRandomizedSFX(footstepClip, 0.1f, 0.1f);
+
+// Pick a random clip from an array/list with randomization
+AudioClip[] footstepClips = { step1, step2, step3 };
+ServiceLocator.Current.Get<IAudioService>().PlayRandomSFXFromList(footstepClips, 0.05f, 0.05f);
 ```
 
 ### ✔ Volume & Settings
 ```csharp
-AudioManager.Instance.SetMusicVolume(0.7f); // Sets music to 70%
-AudioManager.Instance.ToggleSFX(false);      // Mutes all sound effects
+var audioService = ServiceLocator.Current.Get<IAudioService>();
+audioService.SetMusicVolume(0.7f); // Sets music to 70%
+audioService.ToggleSFX(false);      // Mutes all sound effects
 ```
 
 # 💬 MessageManager
@@ -325,19 +346,22 @@ The MessageManager provides a queue-based system to display transient UI notific
 
 The manager supports four primary ways to display messages, depending on whether you are using localization, raw text, custom Sprite references, or custom message prefabs.
 
-```chsarp
+```csharp
 using TitusGames.Framework;
 using UnityEngine;
 
-// 1. Localized Message: Uses a JSON key for translation
-MessageManager.Instance.ShowMessage("game_saved_key", "info_icon_name");
+if (ServiceLocator.Current.TryGet<IMessageService>(out var messageService))
+{
+    // 1. Localized Message: Uses a JSON key for translation
+    messageService.ShowMessage("game_saved_key", "info_icon_name");
 
-// 2. Direct Message: Displays raw string (bypasses localization)
-MessageManager.Instance.ShowMessageDirectly("Connection Lost!", "error_icon_name");
+    // 2. Direct Message: Displays raw string (bypasses localization)
+    messageService.ShowMessageDirectly("Connection Lost!", "error_icon_name");
 
-// 3. Sprite Injection: Passes an explicit Sprite object directly
-Sprite customIcon = Resources.Load<Sprite>("UI/Icons/special_event");
-MessageManager.Instance.ShowMessageWithSprite("event_key", customIcon);
+    // 3. Sprite Injection: Passes an explicit Sprite object directly
+    Sprite customIcon = Resources.Load<Sprite>("UI/Icons/special_event");
+    messageService.ShowMessageWithSprite("event_key", customIcon);
+}
 ```
 ### ✔ How it Works
 
@@ -356,7 +380,7 @@ Message Duration: How long the message remains visible (default is 3 seconds).
 
 Fade Speed: The speed of the fade-in/fade-out animations.
 
-Containers: The manager will automatically register the MessageContainer found in your scene; however, you can manually override this via MessageManager.Instance.RegisterContainer(myRectTransform).
+Containers: The manager will automatically register the MessageContainer found in your scene; however, you can manually override this via RegisterContainer(myRectTransform).
 
 
 # 📘 License

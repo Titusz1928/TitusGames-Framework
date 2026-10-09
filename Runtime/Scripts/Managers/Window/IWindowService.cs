@@ -9,7 +9,8 @@ namespace TitusGames.Framework
         int WindowCount { get; }
         bool IsAnyWindowOpen { get; }
 
-        event Action OnWindowClosed;
+        event Action<GameObject> OnWindowOpened;
+        event Action<GameObject> OnWindowClosed;
 
         void SetNextHandler(ICancelInputHandler next);
         void RegisterPlayerInput(PlayerInput input);
@@ -20,5 +21,6 @@ namespace TitusGames.Framework
         GameObject GetTopWindow();
         void CloseAllWindows();
         void RegisterUIRoot(Transform root);
+        void RegisterManagedOverlay(GameObject overlay);
     }
 }
