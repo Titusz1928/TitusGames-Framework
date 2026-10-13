@@ -74,9 +74,9 @@ namespace TitusGames.Framework
             // 4. Scene Service
             ServiceLocator.Current.GetOrRegister<ISceneService>(() =>
             {
-                var go = new GameObject("SceneManagerEX");
+                var go = new GameObject("DefaultSceneManager");
                 DontDestroyOnLoad(go);
-                return go.AddComponent<SceneManagerEX>();
+                return go.AddComponent<DefaultSceneManager>();
             });
 
             // 5. Audio Service

@@ -16,9 +16,17 @@ namespace TitusGames.Framework
         /// </summary>
         public static ServiceLocator Current => _current ??= new ServiceLocator();
 
-        public static void Initialize()
+        public static void Initialize(bool clearExisting = false)
         {
-            _current = new ServiceLocator();
+            if (_current == null)
+            {
+                _current = new ServiceLocator();
+            }
+            else if (clearExisting)
+            {
+                _current.ClearAll();
+            }
+            // If clearExisting is false, it keeps any services that were registered early!
         }
 
         /// <summary>

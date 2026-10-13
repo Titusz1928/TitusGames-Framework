@@ -2,7 +2,7 @@
   <img src="Media~/logo1.png" width="300" alt="Framework Logo">
 </p>
 
-# TitusGames Framework (v2.2.0)
+# TitusGames Framework (v2.3.0)
 
 A modular, enterprise-ready Unity package designed for rapid **2D and 3D** game assembly. It includes streamlined subsystems for lifecycle initialization, scene routing, nested window management, deep localization streaming, dynamic audio mixing, and queue-driven messaging overlays.
 
@@ -10,30 +10,46 @@ Version 2.0.0 migrates the entire framework core code to an optimized, decoupled
 
 ---
 
-## Update 2.2.0:
+## Update 2.3.0: Modular Scene Architecture & Service Locator Enhancements
 
-### ⚡ Core Subsystem Overhaul & Direct Asset Playback
-
-Version 2.2.0 focuses on robustness, developer experience, and native asset integration across core services.
+Version 2.3.0 introduces a robust framework-level abstraction pattern for scene management, eliminating package-locking friction and hardcoded initialization workarounds.
 
 #### Key Highlights
-* **Service Locator Modernization**: Added native `TryGet<T>` support (eliminating external extension workarounds and exception overhead), Unity object lifetime checks (auto-cleaning destroyed `MonoBehaviour` references), and `GetOrRegister<T>` factory routines.
-* **Smart Window Stack & Duplicate Prevention**: `WindowManager` now prevents duplicate window instantiation. Opening an already active window prefab safely moves it to the top of the stack and brings it to the front visually (`SetAsLastSibling()`).
-* **Managed UI Overlay Snapshots**: Added automatic HUD/overlay snapshot and restore capability (`RegisterManagedOverlay()`), hiding active gameplay UI elements when menus open and restoring their exact state when closed.
-* **Native `AudioClip` Playback**: `AudioManager` and `IAudioService` now accept direct `AudioClip` parameters alongside string resource names, removing the need for custom adapter wrapper scripts.
-* **Window Event Callbacks**: `OnWindowOpened` and `OnWindowClosed` now emit the specific `GameObject` instance for precise event handling.
+* **Abstract** `BaseSceneManager` **Pattern**: Core scene management is now backed by a flexible abstract base class implementing `ISceneService`. It handles standard boilerplate (`LoadScene`, `QuitGame`, `DontDestroyOnLoad`, `ServiceLocator` registration) while exposing a clean `OnCleanupSession()` extension hook for game-specific teardown logic.
+* `DefaultSceneManager` **Fallback**: The package's default out-of-the-box fallback implementation (`SceneManagerEX` renamed to `DefaultSceneManager`) ensures zero configuration is needed for simple projects.
+* **Protected Service Registrations**: `ServiceLocator.Initialize(clearExisting)` can now preserve pre-registered custom services, preventing early project-level initializations from being wiped out by package boot scripts.
+* **Smart Check-Before-Create Bootstrapping**: Both `Boot.cs` and `SandboxInitializer` now utilize true fallbacks (`GetOrRegister`), allowing project-level custom scene managers to seamlessly take precedence with zero race conditions or hacky workarounds.
 
 #### Migration Workflow
+
+##### Upgrading from 2.2.x
+If you are upgrading from 2.2.x, project-level scene managers can now cleanly inherit from `BaseSceneManager` instead of implementing `ISceneService` and handling manual locator registration from scratch:
+
+```csharp
+// Clean, maintainable project-level scene manager
+public class ProjectSceneManager : BaseSceneManager
+{
+    protected override void OnCleanupSession()
+    {
+        // Purge persistent game objects safely when returning to the Main Menu
+        if (GameBoot.PersistentPlayer != null) Destroy(GameBoot.PersistentPlayer);
+        if (GameBoot.PersistentWorld != null) Destroy(GameBoot.PersistentWorld);
+    }
+}
+```
+
+##### Upgrading from 2.1.x
 If you are upgrading from 2.1.x, replace all instances of static access with the new service registry:
 
-Before (Singleton):
+**Before (Singleton):**
 
-```c#
+```csharp
 MessageManager.Instance.ShowMessage("Hello World");
 ```
-After (Service Locator):
+**After (Service Locator):**
 
-```c#
+```csharp
+
 // Safe, exception-free service resolution
 if (ServiceLocator.Current.TryGet<IMessageService>(out var messageService))
 {
@@ -75,10 +91,10 @@ using TitusGames.Framework;
 - **BootManager** – initializes all other managers automatically; no need to manually place managers in new scenes.
 - **2D & 3D Support** – Includes pre-configured sample scenes for both dimensions.
 - **Sandbox Mode** – A dedicated testing environment that mirrors the Boot sequence for isolated development.  
-- **SceneManager** – easily navigate between scenes and exit the game.  
-- **WindowManager** – create UI windows and open them from buttons.  
+- **SceneManager** – easily navigate between scenes, handle game session cleanups, and exit the game.
+- **WindowManager** – create UI windows and open them.  
 - **LocalizationManager** – localize any TextMeshPro UI element with JSON files.  
-- **AudioManager** – play SFX and music stored inside the framework’s audio folder.
+- **AudioManager** – play SFX and music.
 - **MessageManager** – make messages appear.
 
 ---
@@ -148,7 +164,8 @@ Resource Management: All Resources/ folders are kept inside your Samples directo
 
 # 🎮 SceneManager
 
-The `SceneManager` lets you load scenes by name and exit the game. Every new scene that you create should have a canvas which needs a WindowRoot and a MessageContainer gameobject.
+The framework provides an abstract `BaseSceneManager` architecture. Out of the box, the framework uses `DefaultSceneManager`, but projects can effortlessly extend `BaseSceneManager` to create custom scene managers (e.g., `ProjectSceneManager`) that intercept scene transitions and automatically handle game session cleanups without modifying package files.
+
 
 ### ✔ Load a Scene
 ```csharp
@@ -162,25 +179,40 @@ if (ServiceLocator.Current.TryGet<ISceneService>(out var sceneService))
 ```csharp
 if (ServiceLocator.Current.TryGet<ISceneService>(out var sceneService))
 {
-    sceneService.ExitGame();
+    sceneService.QuitGame();
+}
+```
+### ✔ Creating a Project-Level Custom Scene Manager
+To implement custom game logic (such as destroying persistent player or world data when returning to the Main Menu), create a script in your project that inherits from  `BaseSceneManager`:
+
+```csharp
+using TitusGames.Framework;
+using UnityEngine;
+
+public class ProjectSceneManager : BaseSceneManager
+{
+    protected override void OnCleanupSession()
+    {
+        Debug.Log("[ProjectSceneManager] Cleaning up session before returning to menu...");
+        
+        // Custom game teardown logic goes here
+        if (GameBoot.PersistentPlayer != null)
+        {
+            Destroy(GameBoot.PersistentPlayer);
+            GameBoot.PersistentPlayer = null;
+        }
+    }
 }
 ```
 
 ### ✔ Add a Button That Loads a Scene
+1. Add a Unity Button to the UI.
 
-Add a Unity Button to the UI.
+2. Attach the `UI_SceneButton` script to it.
 
-Add the UI_SceneButton script to it.
+3. Enter the target scene name into the Scene Name field.
 
-Enter the scene name into the Scene Name field.
-
-Add an OnClick() event.
-
-Drag the script into the event.
-
-Select:
-
-SceneManager → LoadScene()
+4. Add an `OnClick()` event, drag the button object into the event slot, and select `UI_SceneButton.LoadScene`.
 
 # 🪟 WindowManager
 
@@ -233,7 +265,9 @@ windowService.OnWindowClosed += (win) => Debug.Log($"Closed window: {win.name}")
     if (ServiceLocator.Current.TryGet<IWindowService>(out var windowService))
 {
     windowService.CloseTopWindow();
+    
 }
+
 
 
 # 🌍 LocalizationManager

@@ -11,79 +11,59 @@ namespace TitusGames.Framework
 
         private void InitializeGlobalManagers()
         {
-            // Initialize infrastructure registry container
-            ServiceLocator.Initialize();
+            // Initialize infrastructure registry safely without wiping pre-registered project overrides
+            ServiceLocator.Initialize(clearExisting: false);
 
-            // 1. Scene Service
-            GetOrRegisterService<ISceneService>("SceneManagerEX", () =>
+            // 1. Scene Service (Will respect custom project managers if already registered in the scene)
+            ServiceLocator.Current.GetOrRegister<ISceneService>(() =>
             {
-                var sceneObj = new GameObject("SceneManagerEX");
-                var service = sceneObj.AddComponent<SceneManagerEX>();
+                var sceneObj = new GameObject("DefaultSceneManager");
                 DontDestroyOnLoad(sceneObj);
-                return service;
+                return sceneObj.AddComponent<DefaultSceneManager>();
             });
 
             // 2. Window Service
-            GetOrRegisterService<IWindowService>("WindowManager", () =>
+            ServiceLocator.Current.GetOrRegister<IWindowService>(() =>
             {
                 var windowObj = new GameObject("WindowManager");
-                var service = windowObj.AddComponent<WindowManager>();
                 DontDestroyOnLoad(windowObj);
-                return service;
+                return windowObj.AddComponent<WindowManager>();
             });
 
             // 3. Localization Service
-            var localizationService = GetOrRegisterService<ILocalizationService>("LocalizationManager", () =>
+            var localizationService = ServiceLocator.Current.GetOrRegister<ILocalizationService>(() =>
             {
                 var locObj = new GameObject("LocalizationManager");
-                var service = locObj.AddComponent<LocalizationManager>();
                 DontDestroyOnLoad(locObj);
-                return service;
+                return locObj.AddComponent<LocalizationManager>();
             });
-            localizationService.Initialize();
+            localizationService?.Initialize();
 
             // 4. Audio Service
-            GetOrRegisterService<IAudioService>("AudioManager", () =>
+            ServiceLocator.Current.GetOrRegister<IAudioService>(() =>
             {
                 var audioObj = new GameObject("AudioManager");
-                var service = audioObj.AddComponent<AudioManager>();
                 DontDestroyOnLoad(audioObj);
-                return service;
+                return audioObj.AddComponent<AudioManager>();
             });
 
             // 5. Message Service
-            GetOrRegisterService<IMessageService>("MessageManager", () =>
+            ServiceLocator.Current.GetOrRegister<IMessageService>(() =>
             {
                 var msgObj = new GameObject("MessageManager");
-                var service = msgObj.AddComponent<MessageManager>();
                 DontDestroyOnLoad(msgObj);
+                var service = msgObj.AddComponent<MessageManager>();
 
                 var container = GameObject.Find("MessageContainer");
-                if (container != null)
-                    service.RegisterContainer(container.GetComponent<RectTransform>());
+                if (container != null && container.TryGetComponent<RectTransform>(out var rectTransform))
+                {
+                    service.RegisterContainer(rectTransform);
+                }
 
                 return service;
             });
 
             Debug.Log("<color=cyan>[Sandbox] Global Infrastructure & Services Initialized Cleanly via ServiceLocator.</color>");
-        }
-
-        /// <summary>
-        /// Attempts to fetch a service from the service locator registry container. 
-        /// If missing, triggers a factory callback routine to build and register it safely.
-        /// </summary>
-        private T GetOrRegisterService<T>(string name, System.Func<T> factory) where T : class
-        {
-            try
-            {
-                return ServiceLocator.Current.Get<T>();
-            }
-            catch
-            {
-                T service = factory();
-                ServiceLocator.Current.Register<T>(service);
-                return service;
-            }
         }
     }
 }
