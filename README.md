@@ -2,7 +2,7 @@
   <img src="Media~/logo1.png" width="300" alt="Framework Logo">
 </p>
 
-# TitusGames Framework (v2.3.0)
+# TitusGames Framework (v2.4.0)
 
 A modular, enterprise-ready Unity package designed for rapid **2D and 3D** game assembly. It includes streamlined subsystems for lifecycle initialization, scene routing, nested window management, deep localization streaming, dynamic audio mixing, and queue-driven messaging overlays.
 
@@ -10,15 +10,17 @@ Version 2.0.0 migrates the entire framework core code to an optimized, decoupled
 
 ---
 
-## Update 2.3.0: Modular Scene Architecture & Service Locator Enhancements
+## Update 2.4.0: Cross-Scene Cursor Management & Robust UI Architecture
 
-Version 2.3.0 introduces a robust framework-level abstraction pattern for scene management, eliminating package-locking friction and hardcoded initialization workarounds.
+Version 2.4.0 introduces seamless cross-scene cursor management and enterprise-grade input stability for 3D multiplayer and single-player games.
 
 #### Key Highlights
-* **Abstract** `BaseSceneManager` **Pattern**: Core scene management is now backed by a flexible abstract base class implementing `ISceneService`. It handles standard boilerplate (`LoadScene`, `QuitGame`, `DontDestroyOnLoad`, `ServiceLocator` registration) while exposing a clean `OnCleanupSession()` extension hook for game-specific teardown logic.
-* `DefaultSceneManager` **Fallback**: The package's default out-of-the-box fallback implementation (`SceneManagerEX` renamed to `DefaultSceneManager`) ensures zero configuration is needed for simple projects.
-* **Protected Service Registrations**: `ServiceLocator.Initialize(clearExisting)` can now preserve pre-registered custom services, preventing early project-level initializations from being wiped out by package boot scripts.
-* **Smart Check-Before-Create Bootstrapping**: Both `Boot.cs` and `SandboxInitializer` now utilize true fallbacks (`GetOrRegister`), allowing project-level custom scene managers to seamlessly take precedence with zero race conditions or hacky workarounds.
+- **Self-Cleaning / Preserving `SceneCursorConfigurator`**: Dynamically configure 3D gameplay cursor locks per scene without polluting core framework classes. Includes a `revertOnDestroy` toggle to either auto-reset the cursor when leaving a menu/scene or persist the lock state seamlessly across sequential gameplay scenes.
+- **Input Conflict & Double-Firing Safeguards**: Tightened universal keyboard fallbacks (`Escape` key handling) to prevent race conditions when a New Input System `PlayerInput` component is active on the scene.
+- **Event-Driven UI Debouncing**: Enhanced window-closing lifecycle integration using `OnWindowClosed` events and time-based debouncing to eliminate close/re-open race conditions in pause and test menus.
+- **`EventSystem` Focus Clearing**: Automatic clearing of selected UI objects on final window closure, guaranteeing that hardware closures (like the Escape key) correctly hide and lock the mouse cursor without requiring an initial mouse click.
+
+---
 
 #### Migration Workflow
 
@@ -216,7 +218,7 @@ public class ProjectSceneManager : BaseSceneManager
 
 # 🪟 WindowManager
 
-The WindowManager provides a centralized, stack-based system for managing UI panels. It handles dynamic instantiation, automatic input mapping, time-scaling (pausing), and cursor state management.
+The WindowManager provides a centralized, stack-based system for managing UI panels. It handles dynamic instantiation, automatic input mapping, time-scaling (pausing), cursor locking, and EventSystem focus management.
 
 ### ✔ Architectural Highlights
 * **Duplicate Window Safeguard**: Opening an already-open window prefab brings the existing instance to the visual front (`SetAsLastSibling()`) and moves it to the top of the interaction stack instead of spawning a duplicate.

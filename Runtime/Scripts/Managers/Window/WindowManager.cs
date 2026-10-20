@@ -20,6 +20,10 @@ public class WindowManager : MonoBehaviour,IWindowService, ICancelInputHandler
     public string playerActionMapName = "Player";
     public string cancelActionPath = "UI/Cancel";
 
+    [Header("3D / Gameplay Cursor Behavior")]
+    [Tooltip("If true, locks and hides the mouse cursor when all windows are closed (ideal for 3D gameplay). If false, leaves the cursor visible (ideal for Main Menus & 2D).")]
+    [SerializeField] private bool lockCursorWhenNoWindowsOpen = false;
+
     [Header("Managed Overlays (Auto-Hides during open windows)")]
     [SerializeField] private List<GameObject> managedOverlays = new List<GameObject>();
 
@@ -83,16 +87,16 @@ public class WindowManager : MonoBehaviour,IWindowService, ICancelInputHandler
 
     private void Update()
     {
-        // UNIVERSAL FALLBACK: If no Input Action Asset is active/bound in the scene, 
-        // read the physical keyboard direct hardware state so Escape key still works perfectly.
-        if (useUniversalKeyboardFallback && activePlayerInput == null)
-        {
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            // Universal fallback: Only run if no PlayerInput is bound. 
+            // If PlayerInput is active, its action map handles Escape via OnCancelPressed to prevent double-firing.
+            if (useUniversalKeyboardFallback && activePlayerInput == null)
             {
-                HandleCancel();
+                if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                {
+                    HandleCancel();
+                }
             }
         }
-    }
 
         // --- Chain of Responsibility Control ---
         public void SetNextHandler(ICancelInputHandler next)
@@ -372,8 +376,18 @@ public class WindowManager : MonoBehaviour,IWindowService, ICancelInputHandler
             }
             else
             {
-                Cursor.visible = true;
-                Cursor.lockState = CursorLockMode.None;
+                if (lockCursorWhenNoWindowsOpen)
+                {
+                    // 3D Gameplay Mode: Hide and lock cursor when no menus are open
+                    Cursor.visible = false;
+                    Cursor.lockState = CursorLockMode.Locked;
+                }
+                else
+                {
+                    // 2D / Menu Mode: Keep cursor free and visible
+                    Cursor.visible = true;
+                    Cursor.lockState = CursorLockMode.None;
+                }
             }
 
             // Apply Action Map State Switches
@@ -389,6 +403,15 @@ public class WindowManager : MonoBehaviour,IWindowService, ICancelInputHandler
                     else playerMap.Enable();
                 }
             }
+        }
+
+        /// <summary>
+        /// Dynamically toggles whether the cursor locks/hides when all windows close.
+        /// </summary>
+        public void SetGameplayCursorLock(bool shouldLock)
+        {
+            lockCursorWhenNoWindowsOpen = shouldLock;
+            UpdateInputAndTimeState();
         }
 
         private void OnDestroy()
