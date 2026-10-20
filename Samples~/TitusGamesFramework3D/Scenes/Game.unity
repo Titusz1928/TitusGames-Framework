@@ -798,7 +798,7 @@ GameObject:
   - component: {fileID: 1913152759}
   - component: {fileID: 1913152760}
   m_Layer: 0
-  m_Name: SceneCursorCOnfigurator
+  m_Name: SceneCursorConfigurator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
